@@ -12,5 +12,9 @@ public interface PaymentRepository {
     
     Optional<Payment> findByOrderId(String orderId);
     
+    Optional<Payment> findByIdWithPessimisticLock(Long id);
+    
+    Optional<Payment> findByOrderIdWithPessimisticLock(String orderId);
+    
     boolean existsByOrderId(String orderId);
 }

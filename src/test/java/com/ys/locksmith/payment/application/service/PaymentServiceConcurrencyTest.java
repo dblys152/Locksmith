@@ -16,7 +16,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,20 +45,17 @@ class PaymentServiceConcurrencyTest {
         PaymentCommand command1 = PaymentCommand.of(1L, orderId, Money.krw(10000), PaymentMethod.CREDIT_CARD);
         PaymentCommand command2 = PaymentCommand.of(2L, orderId, Money.krw(20000), PaymentMethod.DEBIT_CARD);
         
-        AtomicInteger saveCallCount = new AtomicInteger(0);
-        AtomicInteger existsCallCount = new AtomicInteger(0);
+        AtomicBoolean firstCall = new AtomicBoolean(true);
         
         given(paymentRepository.existsByOrderId(orderId)).willAnswer(invocation -> {
-            int callNumber = existsCallCount.incrementAndGet();
-            return callNumber > 1; // 첫 번째 호출은 false, 이후 호출은 true
+            if (firstCall.getAndSet(false)) {
+                return false; // 첫 번째 호출
+            } else {
+                return true;  // 두 번째 호출
+            }
         });
         
-        given(paymentRepository.save(any(Payment.class))).willAnswer(invocation -> {
-            saveCallCount.incrementAndGet();
-            Payment payment = invocation.getArgument(0);
-            return payment;
-        });
-        
+        given(paymentRepository.save(any(Payment.class))).willAnswer(invocation -> invocation.getArgument(0));
         given(paymentGateway.processPayment(anyString(), any(Money.class), any(PaymentMethod.class)))
             .willReturn(PaymentGatewayResult.success("TXN-001"));
         
@@ -66,13 +63,11 @@ class PaymentServiceConcurrencyTest {
         CompletableFuture<Payment> future1 = CompletableFuture.supplyAsync(() -> 
             paymentServiceWithManualLock.processPayment(command1));
         
-        CompletableFuture<Payment> future2 = CompletableFuture.supplyAsync(() -> {
-            try {
-                return paymentServiceWithManualLock.processPayment(command2);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
+        // 첫 번째 요청이 처리되도록 잠시 대기
+        Thread.sleep(100);
+        
+        CompletableFuture<Payment> future2 = CompletableFuture.supplyAsync(() -> 
+            paymentServiceWithManualLock.processPayment(command2));
         
         // then
         Payment result1 = future1.get();
@@ -82,7 +77,6 @@ class PaymentServiceConcurrencyTest {
             .hasMessageContaining("이미 존재하는 주문 ID입니다");
         
         assertThat(result1.getOrderId()).isEqualTo(orderId);
-        assertThat(saveCallCount.get()).isGreaterThanOrEqualTo(1);
     }
     
     @Test

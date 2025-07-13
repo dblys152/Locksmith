@@ -81,7 +81,7 @@ class DistributedLockAspectTest {
     @DisplayName("SpEL 표현식 락 키로 AOP가 동작한다")
     void executeWithSpelLockKey() throws Throwable {
         // given
-        String lockKeyExpression = "order:#orderId";
+        String lockKeyExpression = "'order:' + #orderId";
         String expectedLockKey = "order:ORDER-001";
         String expectedResult = "success";
         String orderId = "ORDER-001";

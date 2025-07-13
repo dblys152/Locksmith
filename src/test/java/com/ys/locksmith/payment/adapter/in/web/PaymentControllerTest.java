@@ -11,9 +11,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import com.ys.locksmith.common.exception.GlobalExceptionHandler;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -21,6 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(PaymentController.class)
+@Import(GlobalExceptionHandler.class)
 @DisplayName("결제 컨트롤러 테스트")
 class PaymentControllerTest {
     
@@ -88,7 +91,7 @@ class PaymentControllerTest {
     }
     
     @Test
-    @DisplayName("존재하지 않는 결제 조회 시 404 에러가 발생한다")
+    @DisplayName("존재하지 않는 결제 조회 시 400 에러가 발생한다")
     void getPaymentNotFound() throws Exception {
         // given
         given(paymentUseCase.getPayment(999L))
@@ -96,7 +99,9 @@ class PaymentControllerTest {
         
         // when & then
         mockMvc.perform(get("/api/payments/999"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("결제 정보를 찾을 수 없습니다: 999"));
     }
     
     @Test
@@ -112,6 +117,8 @@ class PaymentControllerTest {
         mockMvc.perform(post("/api/payments")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(invalidRequest)))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("사용자 ID는 필수입니다."));
     }
 }
