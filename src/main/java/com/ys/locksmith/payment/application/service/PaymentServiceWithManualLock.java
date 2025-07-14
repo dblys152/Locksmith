@@ -9,6 +9,8 @@ import com.ys.locksmith.payment.application.port.out.PaymentRepository;
 import com.ys.locksmith.payment.domain.Payment;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,6 +75,7 @@ public class PaymentServiceWithManualLock implements PaymentUseCase {
     }
     
     @Override
+    @Cacheable(value = "payment", key = "#paymentId")
     @Transactional(readOnly = true)
     public Payment getPayment(Long paymentId) {
         return paymentRepository.findById(paymentId)
@@ -80,6 +83,7 @@ public class PaymentServiceWithManualLock implements PaymentUseCase {
     }
     
     @Override
+    @CacheEvict(value = "payment", key = "#paymentId")
     public Payment cancelPayment(Long paymentId) {
         Payment payment = getPayment(paymentId);
         String lockKey = "payment:cancel:" + payment.getOrderId();
